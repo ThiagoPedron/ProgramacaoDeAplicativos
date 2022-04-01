@@ -3,6 +3,10 @@ using static System.Console;
 using System.Data;
 using System.Data.SqlClient;
 
+//definindo o server e a database que serão usadas
+const string Server = "CTPC3616";
+const string DataBase = "ConectaSLQ";
+
 
 
 ClientTable client = new ClientTable();
@@ -21,17 +25,16 @@ foreach (var type in assembly.GetTypes())
 
         foreach (var prop in type.GetProperties())
         {
+            //adicionando a coluna criada
             comando += " " + prop.Name;
+            //verificando suas propriedades
             var typeInt = prop.GetCustomAttribute<IntAttribute>();
             if (typeInt != null) comando += " int";
-
-
             var typeatt = prop.GetCustomAttribute<VarCharAttribute>();
             if (typeatt != null)
             {
                 comando += " VARCHAR(" + typeatt.Size + ")";
             }
-
             var typeNotNull = prop.GetCustomAttribute<NotNullAttribute>();
             if (typeNotNull != null)
             {
@@ -48,21 +51,22 @@ foreach (var type in assembly.GetTypes())
                 comando += " IDENTITY(1, 1)";
             }
 
-
+            //adiciona , no final da linha
             comando += ",";
         }
+        //retira a ultima , do comando sql
         comando = comando.Substring(0, comando.Length - 1);
         comando += ")";
         CoenctaBanco(comando);
-
-
     }
 }
 
+// função que recebe o comando SQL e executa no banco de dados 
 static void CoenctaBanco(string comandoSql)
 {
 
-    string conexao = @"server=CCH01LABF103\TEW_SQLEXPRESS;database=testedatabase;trusted_connection=true;";
+
+    string conexao = @"server="+Server+";database="+DataBase+";trusted_connection=true;";
     SqlConnection conn = new SqlConnection(conexao);
     try
     {
@@ -82,15 +86,17 @@ static void CoenctaBanco(string comandoSql)
 
 }
 
-
+// definindo uma tabela
 public class TableAttribute : Attribute
 {
 
 }
+// definindo uma chave primária
 public class PrimaryKeyAttribute : Attribute
 {
 
 }
+//setando uma teg para um atributo com auto increment 
 public class IdentityAttribute : Attribute
 {
     public IdentityAttribute(int initial, int increment)
@@ -102,10 +108,12 @@ public class IdentityAttribute : Attribute
     public int Initial { get; set; }
     public int Increment { get; set; }
 }
+//setando uma "tag" para o atributo tipo não nulo
 public class NotNullAttribute : Attribute
 {
 
 }
+//setando uma "tag" para o atributo tipo varChar
 public class VarCharAttribute : Attribute
 {
     public VarCharAttribute(int size)
@@ -115,11 +123,12 @@ public class VarCharAttribute : Attribute
 
     public int Size { get; set; }
 }
+//setando uma "tag" para o atributo tipo inteiro
 public class IntAttribute : Attribute
 {
 
 }
-
+/*TABELA CLIENTE*/
 [Table]
 public class ClientTable
 {
@@ -135,9 +144,7 @@ public class ClientTable
 
 
 }
-
-
-
+/*TABELA VENDEDOR*/
 [Table]
 public class VendedorTable
 {
