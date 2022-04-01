@@ -1,102 +1,140 @@
 ﻿using System.Reflection;
 using static System.Console;
-using System.Data;
 using System.Data.SqlClient;
-
-//definindo o server e a database que serão usadas
-const string Server = "CTPC3616";
-const string DataBase = "ConectaSLQ";
+using System.Data;
 
 
+//CreateTable();
+access<Client> access = new access<Client>();
 
-ClientTable client = new ClientTable();
-var assembly = Assembly.GetExecutingAssembly();
+access.Update();
 
-foreach (var type in assembly.GetTypes())
+
+
+// GERA A STRING DE CRIAÇÃO DE TABELAS
+static void CreateTable()
 {
+    string sql = "";
 
-    if (type.GetCustomAttribute<TableAttribute>() != null)
+    // COLOCA EM UMA VARIAVEL A ASSEMBLY DO PROJETO
+    var assembly = Assembly.GetExecutingAssembly();
+
+
+    // PERCORRE TODOS OS TIPOS DA MINHA ASSEMBLY
+    foreach (var type in assembly.GetTypes())
     {
-        string comando = "";
 
-        comando = "CREATE TABLE " + type.Name + " (";
-        List<string> collums = new List<string>();
-        List<string> propriedades = new List<string>();
-
-        foreach (var prop in type.GetProperties())
+        // SEPARA AQUILO QUE TEM A TAG TABLE
+        if (type.GetCustomAttribute<TableAttribute>() != null)
         {
-            //adicionando a coluna criada
-            comando += " " + prop.Name;
-            //verificando suas propriedades
-            var typeInt = prop.GetCustomAttribute<IntAttribute>();
-            if (typeInt != null) comando += " int";
-            var typeatt = prop.GetCustomAttribute<VarCharAttribute>();
-            if (typeatt != null)
+            // INICIA A STRING COM NOME DA TABELA
+            sql = $"CREATE TABLE {type.Name} (";
+
+
+            // PERCORRE TODAS AS PROPRIEDADES DA MINHA CLASSE DE TABELA
+            foreach (var property in type.GetProperties())
             {
-                comando += " VARCHAR(" + typeatt.Size + ")";
-            }
-            var typeNotNull = prop.GetCustomAttribute<NotNullAttribute>();
-            if (typeNotNull != null)
-            {
-                comando += " NOT NULL";
-            }
-            var typePrimaryKey = prop.GetCustomAttribute<PrimaryKeyAttribute>();
-            if (typePrimaryKey != null)
-            {
-                comando += " PRIMARY KEY";
-            }
-            var typeIdentity = prop.GetCustomAttribute<IdentityAttribute>();
-            if (typeIdentity != null)
-            {
-                comando += " IDENTITY(1, 1)";
+
+
+                // CONCATENA O NOME DAS COLUNAS
+                sql += $" {property.Name}";
+
+
+                // CONCATENA OS TIPOS DOS ATRIBUTOS
+                if (property.GetCustomAttribute<IntAttribute>() != null)
+                {
+                    sql += " INT";
+
+                }
+                else if (property.GetCustomAttribute<VarCharAttribute>() != null)
+                {
+                    var typeatt = property.GetCustomAttribute<VarCharAttribute>();
+
+                    sql += $" VARCHAR({typeatt.Size})";
+                }
+
+                // CONCATENA IDENTIDADE
+                var identityatt = property.GetCustomAttribute<IdentityAttribute>();
+                if (identityatt != null)
+                {
+                    sql += $" IDENTITY({identityatt.Initial},{identityatt.Increment})";
+                }
+
+                // CONCATENA NOT NULL
+                var notNullatt = property.GetCustomAttribute<NotNullAttribute>();
+                if (notNullatt != null)
+                {
+                    sql += " NOT NULL";
+                }
+
+                // CONCATENA PRIMARY KEY
+                var primaryKeyatt = property.GetCustomAttribute<PrimaryKeyAttribute>();
+                if (primaryKeyatt != null)
+                {
+                    sql += " PRIMARY KEY";
+                }
+
+
+                sql += ",";
+
             }
 
-            //adiciona , no final da linha
-            comando += ",";
+
+            // RETIRA A ULTIMA "," E ADICIONA ")"
+            sql = sql.Substring(0, sql.Length - 1);
+            sql += ")";
+
+            WriteLine(sql);
+            Banco banco = new Banco();
+            banco.SendCommand(sql);
         }
-        //retira a ultima , do comando sql
-        comando = comando.Substring(0, comando.Length - 1);
-        comando += ")";
-        CoenctaBanco(comando);
     }
 }
 
-// função que recebe o comando SQL e executa no banco de dados 
-static void CoenctaBanco(string comandoSql)
+
+// METODOS DE BANCO DE DADOS
+public class Banco
 {
-
-
-    string conexao = @"server="+Server+";database="+DataBase+";trusted_connection=true;";
-    SqlConnection conn = new SqlConnection(conexao);
-    try
+    // GERA A STRING DE DELETAR TABELAS
+    public void DropTable()
     {
-        conn.Open();
-        SqlCommand command = new SqlCommand(comandoSql, conn);
-        command.ExecuteNonQuery();
-        WriteLine(comandoSql + "\nExecutada com sucesso!");
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine(ex.Message);
-    }
-    finally
-    {
-        conn.Close();
+        string sql = "drop table Client";
+        Banco banco = new Banco();
+        banco.SendCommand(sql);
     }
 
+    // ENVIA A STRING DE COMANDO PARA O SQL
+    public void SendCommand(string sql)
+    {
+        SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder();
+        builder.InitialCatalog = "BD_Experimental";
+        builder.DataSource = "JVLPC0553";
+        builder.IntegratedSecurity = true;
+
+        SqlConnection con;
+        SqlCommand cmd;
+
+        con = new SqlConnection(builder.ConnectionString);
+
+        con.Open();
+
+        cmd = new SqlCommand(sql, con);
+        cmd.ExecuteNonQuery();
+
+        con.Close();
+    }
 }
 
-// definindo uma tabela
+
+// CONFIGURA AS TAGS (TABLE, PRIMARY KEY, VARCHAR ...)
 public class TableAttribute : Attribute
 {
 
 }
-// definindo uma chave primária
 public class PrimaryKeyAttribute : Attribute
 {
 
 }
-//setando uma teg para um atributo com auto increment 
 public class IdentityAttribute : Attribute
 {
     public IdentityAttribute(int initial, int increment)
@@ -105,15 +143,19 @@ public class IdentityAttribute : Attribute
         Increment = increment;
     }
 
-    public int Initial { get; set; }
-    public int Increment { get; set; }
+    public IdentityAttribute() { }
+
+    public int Initial { get; set; } = 1;
+    public int Increment { get; set; } = 1;
 }
-//setando uma "tag" para o atributo tipo não nulo
 public class NotNullAttribute : Attribute
 {
 
 }
-//setando uma "tag" para o atributo tipo varChar
+public class IntAttribute : Attribute
+{
+
+}
 public class VarCharAttribute : Attribute
 {
     public VarCharAttribute(int size)
@@ -121,43 +163,402 @@ public class VarCharAttribute : Attribute
         Size = size;
     }
 
-    public int Size { get; set; }
-}
-//setando uma "tag" para o atributo tipo inteiro
-public class IntAttribute : Attribute
-{
+    public VarCharAttribute() { }
 
+    public int Size { get; set; } = 100;
 }
-/*TABELA CLIENTE*/
+
+
+// DEFINE AS TABELAS 
 [Table]
-public class ClientTable
+public class Client
 {
-    [PrimaryKey]
-    [Identity(1, 1)]
     [Int]
-    public int Id { get; set; }
-
+    [PrimaryKey]
+    [Identity()]
+    public int Id_Client { get; set; }
 
     [VarChar(50)]
     [NotNull]
     public string Name { get; set; }
-
-
 }
-/*TABELA VENDEDOR*/
 [Table]
-public class VendedorTable
+public class Product
 {
-    [PrimaryKey]
-    [Identity(1, 1)]
     [Int]
-    public int Id { get; set; }
+    [PrimaryKey]
+    [Identity()]
+    public int Id_Product { get; set; }
 
-
-    [VarChar(50)]
+    [VarChar(100)]
     [NotNull]
     public string Name { get; set; }
+}
+[Table]
+public class Endereco
+{
+    [Int]
+    [PrimaryKey]
+    [Identity()]
+    public int Id_Endereco { get; set; }
+
+    [VarChar(100)]
+    [NotNull]
+    public string Rua { get; set; }
+
+    [Int]
+    [NotNull]
+    public string Numero { get; set; }
+}
+
+
+
+
+
+public class access<T>
+    where T : new()
+{
+
+    public void Select()
+    {
+
+        SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder();
+        builder.InitialCatalog = "BD_Experimental";
+        builder.DataSource = "JVLPC0553";
+        builder.IntegratedSecurity = true;
+
+        SqlConnection con;
+        SqlCommand cmd;
+
+        con = new SqlConnection(builder.ConnectionString);
+
+        con.Open();
+
+        var query = "select * from " + typeof(T).Name;
+
+        cmd = new SqlCommand(query, con);
+
+        DataTable dt = new DataTable();
+        dt.Load(cmd.ExecuteReader());
+
+        con.Close();
+
+        foreach (DataRow dataRow in dt.Rows)
+        {
+            foreach (var item in dataRow.ItemArray)
+            {
+                Console.Write($"{item} ");
+            }
+            WriteLine();
+        }
+
+    }
+
+    public void SelectWhereId()
+    {
+        SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder();
+        builder.InitialCatalog = "BD_Experimental";
+        builder.DataSource = "JVLPC0553";
+        builder.IntegratedSecurity = true;
+
+        SqlConnection con;
+        SqlCommand cmd;
+
+        con = new SqlConnection(builder.ConnectionString);
+
+        con.Open();
+
+
+        var assembly = Assembly.GetExecutingAssembly();
+
+        string id = "";
+        foreach (var type in assembly.GetTypes())
+        {
+            if (type.Name == typeof(T).Name)
+            {
+                foreach (var property in type.GetProperties())
+                {
+                    if (property.GetCustomAttribute<PrimaryKeyAttribute>() != null)
+                    {
+                        id = property.Name;
+                    }
+                }
+            }
+        }
+
+
+
+        var query = "select * from " + typeof(T).Name + $" WHERE {id} = ";
+
+        Write("Digite a id que deseja procurar: ");
+        query += $"{ReadLine()}";
+
+
+        cmd = new SqlCommand(query, con);
+
+        DataTable dt = new DataTable();
+        dt.Load(cmd.ExecuteReader());
+
+        con.Close();
+
+        foreach (DataRow dataRow in dt.Rows)
+        {
+            foreach (var item in dataRow.ItemArray)
+            {
+                Console.Write($"{item} ");
+            }
+            WriteLine();
+        }
+    }
+
+    public void SelectWhere()
+    {
+        SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder();
+        builder.InitialCatalog = "BD_Experimental";
+        builder.DataSource = "JVLPC0553";
+        builder.IntegratedSecurity = true;
+
+        SqlConnection con;
+        SqlCommand cmd;
+
+        con = new SqlConnection(builder.ConnectionString);
+
+        con.Open();
+
+        int i = 0;
+        var assembly = Assembly.GetExecutingAssembly();
+
+        WriteLine("Menu\n");
+        foreach (var type in assembly.GetTypes())
+        {
+            if (type.Name == typeof(T).Name)
+            {
+                foreach (var property in type.GetProperties())
+                {
+                    WriteLine($"{i} - {property.Name}");
+                    i++;
+                }
+            }
+        }
+
+
+        string campo = "";
+        int valor = int.Parse(ReadLine());
+        i = 0;
+
+        foreach (var type in assembly.GetTypes())
+        {
+            if (type.Name == typeof(T).Name)
+            {
+                foreach (var property in type.GetProperties())
+                {
+                    if (i == valor)
+                    {
+                        campo = property.Name;
+                    }
+                    i++;
+                }
+            }
+        }
+
+
+        var query = "select * from " + typeof(T).Name + $" WHERE {campo} = ";
+
+        Write($"Digite a {campo} que deseja procurar: ");
+        query += $"'{ReadLine()}'";
+
+
+        cmd = new SqlCommand(query, con);
+
+        DataTable dt = new DataTable();
+        dt.Load(cmd.ExecuteReader());
+
+        con.Close();
+
+        foreach (DataRow dataRow in dt.Rows)
+        {
+            foreach (var item in dataRow.ItemArray)
+            {
+                Console.Write($"{item} ");
+            }
+            WriteLine();
+        }
+    }
+
+    public void Insert()
+    {
+
+        var assembly = Assembly.GetExecutingAssembly();
+
+        foreach (var type in assembly.GetTypes())
+        {
+            if (type.Name == typeof(T).Name)
+            {
+
+                string comando = $"INSERT INTO {type.Name} (";
+
+
+                // PERCORRE TODAS AS PROPRIEDADES DA MINHA CLASSE DE TABELA
+                foreach (var property in type.GetProperties())
+                {
+                    if (property.GetCustomAttribute<PrimaryKeyAttribute>() == null)
+                    {
+                        comando += $"{property.Name},";
+                    }
+                }
+
+                comando = comando.Substring(0, comando.Length - 1);
+                comando += ") VALUES (";
+
+                foreach (var property in type.GetProperties())
+                {
+                    if (property.GetCustomAttribute<PrimaryKeyAttribute>() == null)
+                    {
+                        WriteLine($"Digite o valor para {property.Name}");
+
+                        comando += $"'{ReadLine()}',";
+                    }
+                }
+                comando = comando.Substring(0, comando.Length - 1);
+                comando += ")";
+
+                Banco banco = new Banco();
+                banco.SendCommand(comando);
+            }
+        }
+    }
+
+    public void Delete()
+    {
+        SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder();
+        builder.InitialCatalog = "BD_Experimental";
+        builder.DataSource = "JVLPC0553";
+        builder.IntegratedSecurity = true;
+
+        SqlConnection con;
+        SqlCommand cmd;
+
+        con = new SqlConnection(builder.ConnectionString);
+
+        con.Open();
+
+        int i = 0;
+        var assembly = Assembly.GetExecutingAssembly();
+
+        WriteLine("Menu\n");
+        foreach (var type in assembly.GetTypes())
+        {
+            if (type.Name == typeof(T).Name)
+            {
+                foreach (var property in type.GetProperties())
+                {
+                    WriteLine($"{i} - {property.Name}");
+                    i++;
+                }
+            }
+        }
+
+
+        string campo = "";
+        int valor = int.Parse(ReadLine());
+        i = 0;
+
+        foreach (var type in assembly.GetTypes())
+        {
+            if (type.Name == typeof(T).Name)
+            {
+                foreach (var property in type.GetProperties())
+                {
+                    if (i == valor)
+                    {
+                        campo = property.Name;
+                    }
+                    i++;
+                }
+            }
+        }
+
+
+        var query = "DELETE from " + typeof(T).Name + $" WHERE {campo} = ";
+
+        Write($"Digite a {campo} que deseja procurar: ");
+        query += $"'{ReadLine()}'";
+
+
+        cmd = new SqlCommand(query, con);
+
+        DataTable dt = new DataTable();
+        dt.Load(cmd.ExecuteReader());
+
+        con.Close();
+
+        foreach (DataRow dataRow in dt.Rows)
+        {
+            foreach (var item in dataRow.ItemArray)
+            {
+                Console.Write($"{item} ");
+            }
+            WriteLine();
+        }
+    }
+
+    public void Update()
+    {
+        int i = 0;
+        var assembly = Assembly.GetExecutingAssembly();
+
+        WriteLine("Menu\n");
+        foreach (var type in assembly.GetTypes())
+        {
+            if (type.Name == typeof(T).Name)
+            {
+                foreach (var property in type.GetProperties())
+                {
+                    WriteLine($"{i} - {property.Name}");
+                    i++;
+                }
+            }
+        }
+
+
+        string campo = "";
+        int valor = int.Parse(ReadLine());
+        i = 0;
+
+        foreach (var type in assembly.GetTypes())
+        {
+            if (type.Name == typeof(T).Name)
+            {
+                foreach (var property in type.GetProperties())
+                {
+                    if (i == valor)
+                    {
+                        campo = property.Name;
+                    }
+                    i++;
+                }
+            }
+        }
+
+
+
+
+
+        Write($"Digite o valor do campo que quer atualizar: ");
+        string linha = $"'{ReadLine()}'";
+        Write($"Digite o novo valor desse campo: ");
+        string novo = $"'{ReadLine()}'";
+
+
+        var query = "UPDATE " + typeof(T).Name + " SET " + campo + " = " + novo + " where " + campo + " = " + linha;
+
+
+
+        Banco banco = new Banco();
+        banco.SendCommand(query);
+
+    }
+
 
 
 }
-
